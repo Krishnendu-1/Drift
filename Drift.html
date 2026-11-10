@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Drift</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,9..144,300;1,9..144,500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#14102a;--ink:#ece6fa;--ui:rgba(236,230,250,.78);--line:rgba(236,230,250,.3);color-scheme:dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14102a;--ink:#ece6fa}}
+:root[data-theme="dark"]{--bg:#14102a;--ink:#ece6fa}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--ink);font-family:"Fraunces",Georgia,"Times New Roman",serif;font-style:italic;font-weight:300}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}
+.head{position:fixed;left:0;top:0;padding:calc(env(safe-area-inset-top,0px) + 18px) 24px 0;pointer-events:none}
+h1{margin:0;font-weight:300;font-size:clamp(3rem,11vw,7rem);line-height:.95;letter-spacing:-.02em}
+.hint{margin:.6rem 0 0;max-width:26ch;font-size:1.05rem;line-height:1.4;color:var(--ui);transition:opacity 1.2s ease}
+.used .hint{opacity:0}
+.bar{position:fixed;left:0;right:0;bottom:0;display:flex;flex-wrap:wrap;align-items:center;gap:14px;padding:16px 22px calc(env(safe-area-inset-bottom,0px) + 18px)}
+.sw{display:flex;gap:10px;margin-right:auto}
+.sw button{width:26px;height:26px;border-radius:50%;border:1px solid var(--line);padding:0;cursor:pointer;outline-offset:3px}
+.sw button[aria-pressed="true"]{box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px var(--ink)}
+.txt{font:inherit;font-size:1.05rem;color:var(--ink);background:none;border:0;border-bottom:1px solid var(--line);padding:2px 0;cursor:pointer}
+.txt:hover{border-color:var(--ink)}
+button:focus-visible{outline:2px solid var(--ink)}
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="Interactive flowing light drawing"></canvas>
+<div class="head"><h1>Drift</h1><p class="hint">Drag to steer the current. Press and hold to push it away.</p></div>
+<div class="bar">
+  <div class="sw" id="sw" role="group" aria-label="Palette"></div>
+  <button class="txt" id="mode">Flow</button>
+  <button class="txt" id="clear">Clear</button>
+</div>
+<script>
+(function(){
+var cv=document.getElementById('c'),ctx=cv.getContext('2d');
+var root=document.documentElement;
+var PAL=[
+ {n:'Dusk',bg:[20,16,42],h0:255,h1:335,l:62,a:.22,fade:.07,light:false,ink:'#ece6fa'},
+ {n:'Tide',bg:[6,24,30],h0:150,h1:205,l:58,a:.22,fade:.07,light:false,ink:'#dff6f1'},
+ {n:'Ember',bg:[30,14,10],h0:2,h1:48,l:58,a:.24,fade:.07,light:false,ink:'#fbe7d8'},
+ {n:'Paper',bg:[240,234,221],h0:222,h1:352,l:28,a:.5,fade:.05,light:true,ink:'#262335'}
+];
+var pi=0,P=PAL[0],mode=0,W=0,H=0,ps=[],t=0;
+var rm=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+var ptr={x:0,y:0,vx:0,vy:0,on:false,down:false,last:-1e9};
+function hex(b){return '#'+b.map(function(v){return ('0'+v.toString(16)).slice(-2)}).join('')}
+function fillAll(){ctx.globalCompositeOperation='source-over';ctx.fillStyle='rgb('+P.bg.join(',')+')';ctx.fillRect(0,0,W,H)}
+function spawn(p){p.x=Math.random()*W;p.y=Math.random()*H;p.px=p.x;p.py=p.y;p.vx=p.vy=0;p.life=200+Math.random()*400}
+function size(){
+ var d=Math.min(window.devicePixelRatio||1,2);W=innerWidth;H=innerHeight;
+ cv.width=W*d;cv.height=H*d;ctx.setTransform(d,0,0,d,0,0);
+ var n=Math.min(1800,Math.round(W*H/900));if(rm)n=Math.round(n/3);
+ while(ps.length<n){var p={k:Math.random()};spawn(p);ps.push(p)}
+ ps.length=n;fillAll();
+}
+function applyPal(wasLight){
+ P=PAL[pi];
+ root.style.setProperty('--bg',hex(P.bg));root.style.setProperty('--ink',P.ink);
+ root.style.setProperty('--ui',P.ink+'c7');root.style.setProperty('--line',P.ink+'4d');
+ root.style.colorScheme=P.light?'light':'dark';
+ if(wasLight!==P.light)fillAll();
+ var b=document.querySelectorAll('#sw button');
+ for(var i=0;i<b.length;i++)b[i].setAttribute('aria-pressed',i===pi?'true':'false');
+}
+function setPal(i){var w=P.light;pi=i;applyPal(w)}
+var sw=document.getElementById('sw');
+PAL.forEach(function(p,i){
+ var b=document.createElement('button');b.setAttribute('aria-label',p.n+' palette');b.title=p.n;
+ b.style.background='linear-gradient(135deg,hsl('+p.h0+',70%,'+(p.light?35:60)+'%),hsl('+p.h1+',75%,'+(p.light?40:62)+'%))';
+ b.style.borderColor='rgba(255,255,255,.35)';
+ b.onclick=function(){setPal(i)};sw.appendChild(b);
+});
+var mb=document.getElementById('mode');
+function setMode(m){mode=m;mb.textContent=m?'Orbit':'Flow';mb.setAttribute('aria-label','Mode: '+mb.textContent+'. Click to switch.')}
+mb.onclick=function(){setMode(1-mode)};
+document.getElementById('clear').onclick=fillAll;
+addEventListener('keydown',function(e){
+ if(e.key>='1'&&e.key<='4')setPal(+e.key-1);
+ else if(e.key==='m')setMode(1-mode);
+ else if(e.key==='c')fillAll();
+});
+function used(){document.body.classList.add('used')}
+function move(e){
+ var nx=e.clientX,ny=e.clientY;
+ if(ptr.on){ptr.vx=ptr.vx*.6+(nx-ptr.x)*.4;ptr.vy=ptr.vy*.6+(ny-ptr.y)*.4}
+ ptr.x=nx;ptr.y=ny;ptr.on=true;ptr.last=performance.now();
+}
+cv.addEventListener('pointermove',function(e){move(e);if(e.buttons)used()});
+cv.addEventListener('pointerdown',function(e){move(e);ptr.down=true;used();try{cv.setPointerCapture(e.pointerId)}catch(_){}});
+function up(){ptr.down=false}
+cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+cv.addEventListener('pointerleave',function(e){if(e.pointerType==='mouse'&&!ptr.down)ptr.on=false});
+var gx=0,gy=0;
+function frame(ts){
+ t=ts*.001;
+ ctx.globalCompositeOperation='source-over';
+ ctx.fillStyle='rgba('+P.bg.join(',')+','+P.fade+')';ctx.fillRect(0,0,W,H);
+ ctx.globalCompositeOperation=P.light?'source-over':'lighter';
+ var idle=ts-ptr.last>4000,q=ptr;
+ if(idle){
+  var nx=W/2+Math.sin(t*.37)*W*.32,ny=H/2+Math.cos(t*.53)*H*.28;
+  gx=gx*.9+(nx-gx)*.1;
+  q={x:nx,y:ny,vx:Math.cos(t*.37)*W*.0012*30,vy:-Math.sin(t*.53)*H*.0016*30,on:true,down:false};
+ }
+ if(!idle){ptr.vx*=.92;ptr.vy*=.92}
+ var R=Math.max(140,Math.min(W,H)*.28),acc=rm?.04:.11,lc=P.light;
+ ctx.lineWidth=lc?1.1:1;ctx.lineCap='round';
+ for(var i=0;i<ps.length;i++){
+  var p=ps[i];
+  var a=(Math.sin(p.x*.0031+t*.21)*2+Math.cos(p.y*.0042-t*.17)*2+Math.sin((p.x+p.y)*.0019+t*.11))*1.1;
+  p.vx+=Math.cos(a)*acc;p.vy+=Math.sin(a)*acc;
+  if(q.on){
+   var dx=p.x-q.x,dy=p.y-q.y,d=Math.sqrt(dx*dx+dy*dy)+1,f=Math.max(0,1-d/R);
+   if(f>0){
+    if(mode===0){p.vx+=q.vx*f*.12;p.vy+=q.vy*f*.12}
+    else{p.vx+=(-dy/d)*f*1.1-dx/d*f*.15;p.vy+=(dx/d)*f*1.1-dy/d*f*.15}
+    if(q.down){p.vx+=dx/d*f*2.4;p.vy+=dy/d*f*2.4}
+   }
+  }
+  p.vx*=.95;p.vy*=.95;
+  p.px=p.x;p.py=p.y;p.x+=p.vx;p.y+=p.vy;
+  var s=Math.sqrt(p.vx*p.vx+p.vy*p.vy);
+  var hue=P.h0+(P.h1-P.h0)*p.k+s*3;
+  ctx.strokeStyle='hsla('+hue+',80%,'+(P.l+(lc?-s:s*2))+'%,'+Math.min(.9,P.a+s*.05)+')';
+  ctx.beginPath();ctx.moveTo(p.px,p.py);ctx.lineTo(p.x,p.y);ctx.stroke();
+  if(--p.life<=0||p.x<-10||p.x>W+10||p.y<-10||p.y>H+10)spawn(p);
+ }
+ requestAnimationFrame(frame);
+}
+addEventListener('resize',size);
+setMode(0);size();applyPal(false);
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

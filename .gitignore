@@ -1,0 +1,62 @@
+# =========================
+# Terraform
+# =========================
+# Local .terraform directories
+**/.terraform/*
+
+# .tfstate files (contain sensitive infrastructure data)
+*.tfstate
+*.tfstate.*
+.terraform.tfstate.lock.info
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Exclude .tfvars files that may contain sensitive data
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+
+# Ignore override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Ignore CLI configuration and plan files
+.terraformrc
+terraform.rc
+*tfplan*
+
+# =========================
+# HTML / Web & Node
+# =========================
+# Dependencies and package caches
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs and static site generators
+dist/
+build/
+out/
+.cache/
+.next/
+.nuxt/
+
+# Environment variables and secrets
+.env
+.env.local
+.env.*.local
+
+# =========================
+# OS & Editor Files
+# =========================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*.log

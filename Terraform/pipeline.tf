@@ -1,4 +1,3 @@
-# GitHub Connection (Requires one-time authorization in AWS Console after apply)
 resource "aws_codestarconnections_connection" "github" {
   name          = "github-static-site-conn"
   provider_type = "GitHub"
@@ -33,7 +32,7 @@ resource "aws_codepipeline" "static_site_pipeline" {
   }
 
   stage {
-    name = "Deploy"
+    name = "Deploy" #here browser can run smoothly raw .html file as there is no tsx, react, nodejs app...if it's there then aws build stage 1.5 codebuild is required to spin a docker container and install npm dependencies to dist/ folder and then pass it to s3 deploy.
 
     action {
       name            = "S3_Deploy"
@@ -54,4 +53,5 @@ resource "aws_codepipeline" "static_site_pipeline" {
 output "website_endpoint_url" {
   description = "Live URL of the Static Website"
   value       = "http://${aws_s3_bucket_website_configuration.website_config.website_endpoint}"
-}
+} #just to check the cloudfront is working or not by denying the access to the bucket
+

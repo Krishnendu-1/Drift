@@ -7,5 +7,5 @@ variable "github_repo" {
 }
 
 variable "github_branch" {
-    description = "GitHub branch"
+  description = "GitHub branch"
 }

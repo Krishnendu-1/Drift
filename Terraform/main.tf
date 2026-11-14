@@ -1,8 +1,9 @@
 resource "aws_s3_bucket" "website_bucket" {
   bucket        = var.website_bucket_name
-  force_destroy = true 
+  force_destroy = true
 }
 
+#This resource just make the bucket a http endpoint
 resource "aws_s3_bucket_website_configuration" "website_config" {
   bucket = aws_s3_bucket.website_bucket.id
 
@@ -32,11 +33,18 @@ resource "aws_s3_bucket_policy" "website_bucket_policy" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid       = "PublicReadGetObject"
-        Effect    = "Allow"
-        Principal = "*"
-        Action    = "s3:GetObject"
-        Resource  = "${aws_s3_bucket.website_bucket.arn}/*"
+        Sid    = "CloudFrontAcessReadOnly" #statement Id
+        Effect = "Allow"                   #allow or deny, the outcome of the policy
+        Principal = {
+          Service = "cloudfront.amazonaws.com"
+        }                                                  #who should have the access to allow or deny(effect)
+        Action   = "s3:GetObject"                          #the operations allowed to do
+        Resource = "${aws_s3_bucket.website_bucket.arn}/*" #what resources
+        Condition = {
+          StringEquals = {
+            "AWS:SourceArn" = aws_cloudfront_distribution.s3_distribution.arn
+          }
+        }
       }
     ]
   })
@@ -46,3 +54,6 @@ resource "aws_s3_bucket" "artifact_bucket" {
   bucket        = "${var.website_bucket_name}-pipeline-artifacts"
   force_destroy = true
 }
+
+#there might be a question, why we need two buckets?? One is public and another one is private
+#--> coz, codepipeline under the hood can't store the files in memory to pass to the next stage, it need a intermediary artifact(.zip) storage from where the next stage will pull the .zip file, extracts it. The final deploy stage extracts the artifact and pass to the public bucket
